@@ -17,13 +17,13 @@ def encode_to_onehot(output):
 
 def calc_accuracy(output, truth):
     assert len(output) == len(truth), 'Output and truth must be same length'
-    return np.sum(output == truth) / len(output)
+    return np.sum(np.argmax(output, 1) == np.argmax(truth, 1)) / len(output)
 
 class SimpleNN():
     # HYPER PARAMETERS
     # Each entry represents a layer of size n
     # These are just defaults, can be set train() function as well
-    HIDDEN_LAYERS = [32, 32]
+    HIDDEN_LAYERS = []
     NUM_EPOCHS = 50
     BATCH_SIZE = 100
     LEARNING_RATE = 0.1
@@ -95,15 +95,12 @@ class SimpleNN():
         output, dots, activations = self.forward(examples)
 
         for ex in range(num_examples):
-            total_error = sum(output[ex]-labels[ex])
             
-            # p(Error)/p(Neuron) is initially 1
-            neuron_partials = [1] * self.OUTPUT_LAYER_SIZE
-
+            # p(Error)/p(Neuron) is initially output-target
+            neuron_partials = output[ex]-labels[ex]
             for i in list(range(len(self.weights)))[::-1]:
                 # calculate the partials of Error w/ respect to dot product of weights and inputs
                 dot_partials = sigmoid_deriv(dots[i][:, ex]) * neuron_partials
-
                 # calculate new neuron partial derivatives w/ respect to the neurons behind
                 # this vectorization took me forever to figure out lmao
                 neuron_partials = self.weights[i].T.dot(dot_partials)
@@ -113,12 +110,13 @@ class SimpleNN():
                     # neuron_partials.append(0)
                     # for k in range(len(dot_partials)):
                         # neuron_partials[j] += self.weights[i][k, j] * dot_partials[k]
-
-                weight_partials = dot_partials.reshape(len(dot_partials), 1).dot(activations[i][:,ex].reshape(1, len(activations[i][:,ex])))
+                
+                dot_partials = dot_partials.reshape(len(dot_partials), 1)
+                activations_T = activations[i][:,ex].reshape(1, len(activations[i][:,ex]))
+                weight_partials = dot_partials.dot(activations_T)
                 weight_updates[i] += weight_partials
-                bias_updates[i] += dot_partials.reshape(len(dot_partials), 1)
-            #    print(dot_partials)
-        print(weight_updates[2]) 
+                bias_updates[i] += dot_partials
+
         return weight_updates, bias_updates
 
     def train(self, batch_size=BATCH_SIZE, epochs=NUM_EPOCHS, learning_rate=LEARNING_RATE):
@@ -136,8 +134,8 @@ class SimpleNN():
                 weight_updates, bias_updates = self.backward(self.train_data[start:end].T, self.train_labels[start:end])
                 
                 for i in range(len(self.weights)):
-                    self.weights[i] += weight_updates[i] * (learning_rate / batch_size)
-                    self.biases[i] += bias_updates[i] * (learning_rate / batch_size)
+                    self.weights[i] -= weight_updates[i] * (learning_rate / batch_size)
+                    self.biases[i] -= bias_updates[i] * (learning_rate / batch_size)
 
             self.display_accuracy()
 
@@ -145,6 +143,6 @@ class SimpleNN():
 
     def display_accuracy(self):
         error = calc_accuracy(encode_to_onehot(self.forward(self.train_data.T)[0]), self.train_labels)
-        print('Training error of {0}'.format(error)) 
+        print('Training error of {:2}'.format(error)) 
         return error
 
