@@ -23,10 +23,10 @@ class SimpleNN():
     # HYPER PARAMETERS
     # Each entry represents a layer of size n
     # These are just defaults, can be set train() function as well
-    HIDDEN_LAYERS = []
-    NUM_EPOCHS = 50
+    HIDDEN_LAYERS = [32]
+    NUM_EPOCHS = 3
     BATCH_SIZE = 100
-    LEARNING_RATE = 0.1
+    LEARNING_RATE = 1
 
     # Each entry represents a layer of size n
     INPUT_SIZE = 784
@@ -94,33 +94,36 @@ class SimpleNN():
 
         output, dots, activations = self.forward(examples)
 
-        for ex in range(num_examples):
             
-            # p(Error)/p(Neuron) is initially output-target
-            neuron_partials = output[ex]-labels[ex]
-            for i in list(range(len(self.weights)))[::-1]:
-                # calculate the partials of Error w/ respect to dot product of weights and inputs
-                dot_partials = sigmoid_deriv(dots[i][:, ex]) * neuron_partials
-                # calculate new neuron partial derivatives w/ respect to the neurons behind
-                # this vectorization took me forever to figure out lmao
-                neuron_partials = self.weights[i].T.dot(dot_partials)
+        # p(Error)/p(Neuron) is initially output-target
+        neuron_partials = output-labels
 
-                # non vectorized
-                # for j in range(self.weights[i].shape[1]):
-                    # neuron_partials.append(0)
-                    # for k in range(len(dot_partials)):
-                        # neuron_partials[j] += self.weights[i][k, j] * dot_partials[k]
-                
-                dot_partials = dot_partials.reshape(len(dot_partials), 1)
-                activations_T = activations[i][:,ex].reshape(1, len(activations[i][:,ex]))
-                weight_partials = dot_partials.dot(activations_T)
-                weight_updates[i] += weight_partials
-                bias_updates[i] += dot_partials
+        for i in list(range(len(self.weights)))[::-1]:
+            # calculate the partials of Error w/ respect to dot product of weights and inputs
+            # print(dots[i].shape)
+            # print(sigmoid_deriv(dots[i]).shape)
+            # print(neuron_partials.shape)
+            dot_partials = sigmoid_deriv(dots[i]) * neuron_partials.T
+            # calculate new neuron partial derivatives w/ respect to the neurons behind
+            # this vectorization took me forever to figure out lmao
+            neuron_partials = self.weights[i].T.dot(dot_partials).T
+
+            # non vectorized
+            # for j in range(self.weights[i].shape[1]):
+                # neuron_partials.append(0)
+                # for k in range(len(dot_partials)):
+                    # neuron_partials[j] += self.weights[i][k, j] * dot_partials[k]
+            
+            weight_partials = dot_partials.dot(activations[i].T)
+            weight_updates[i] += weight_partials
+            # print(np.array(dot_partials.sum(axis=1)).shape)
+            # print(type(dot_partials.sum(axis=1)))
+            # print(type(dot_partials))
+            bias_updates[i] += np.array(dot_partials.sum(axis=1)).reshape(len(bias_updates[i]), 1)
 
         return weight_updates, bias_updates
 
     def train(self, batch_size=BATCH_SIZE, epochs=NUM_EPOCHS, learning_rate=LEARNING_RATE):
-        self.display_accuracy()
         for _ in range(epochs):
             # randomize the order
             random_permutation = np.random.permutation(self.train_data.shape[0])
@@ -128,8 +131,7 @@ class SimpleNN():
             self.train_labels = self.train_labels[random_permutation]
 
             # perform minibatch SGD
-            for start in range(0, int(len(self.train_data) / 20), batch_size):
-                print(start)
+            for start in range(0, len(self.train_data), batch_size):
                 end = start + batch_size
                 weight_updates, bias_updates = self.backward(self.train_data[start:end].T, self.train_labels[start:end])
                 
@@ -137,7 +139,8 @@ class SimpleNN():
                     self.weights[i] -= weight_updates[i] * (learning_rate / batch_size)
                     self.biases[i] -= bias_updates[i] * (learning_rate / batch_size)
 
-            self.display_accuracy()
+                if start % 1000 == 0:
+                    self.display_accuracy()
 
         print('Training finished.')
 
