@@ -23,7 +23,7 @@ class SimpleNN():
     # HYPER PARAMETERS
     # Each entry represents a layer of size n
     # These are just defaults, can be set train() function as well
-    HIDDEN_LAYERS = [32]
+    HIDDEN_LAYERS = [32, 32]
     NUM_EPOCHS = 3
     BATCH_SIZE = 100
     LEARNING_RATE = 1
@@ -45,7 +45,7 @@ class SimpleNN():
         for i in range(1, len(all_layer_sizes)):
             # randomly initialize weights to break symmetry
             weight_matrix = (np.random.rand(all_layer_sizes[i], all_layer_sizes[i-1]) - 0.5)
-            bias_matrix = np.random.rand(all_layer_sizes[i], 1) / 10
+            bias_matrix = np.zeros((all_layer_sizes[i], 1))
             self.weights.append(weight_matrix)
             self.biases.append(bias_matrix)
 
@@ -96,29 +96,16 @@ class SimpleNN():
 
             
         # p(Error)/p(Neuron) is initially output-target
-        neuron_partials = output-labels
+        neuron_partials = (output-labels).T
 
         for i in list(range(len(self.weights)))[::-1]:
             # calculate the partials of Error w/ respect to dot product of weights and inputs
-            # print(dots[i].shape)
-            # print(sigmoid_deriv(dots[i]).shape)
-            # print(neuron_partials.shape)
-            dot_partials = sigmoid_deriv(dots[i]) * neuron_partials.T
+            dot_partials = sigmoid_deriv(dots[i]) * neuron_partials
             # calculate new neuron partial derivatives w/ respect to the neurons behind
             # this vectorization took me forever to figure out lmao
-            neuron_partials = self.weights[i].T.dot(dot_partials).T
+            neuron_partials = self.weights[i].T.dot(dot_partials)
 
-            # non vectorized
-            # for j in range(self.weights[i].shape[1]):
-                # neuron_partials.append(0)
-                # for k in range(len(dot_partials)):
-                    # neuron_partials[j] += self.weights[i][k, j] * dot_partials[k]
-            
-            weight_partials = dot_partials.dot(activations[i].T)
-            weight_updates[i] += weight_partials
-            # print(np.array(dot_partials.sum(axis=1)).shape)
-            # print(type(dot_partials.sum(axis=1)))
-            # print(type(dot_partials))
+            weight_updates[i] += dot_partials.dot(activations[i].T)
             bias_updates[i] += np.array(dot_partials.sum(axis=1)).reshape(len(bias_updates[i]), 1)
 
         return weight_updates, bias_updates
